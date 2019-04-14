@@ -1,11 +1,14 @@
 package com.example.androidlocationdweet
 
+import android.content.Intent
+import android.content.IntentSender
 import android.content.pm.PackageManager
 import android.location.Location
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.support.v4.app.ActivityCompat
 import com.google.android.gms.common.api.Api
+import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.*
 
 import com.google.android.gms.maps.CameraUpdateFactory
@@ -14,16 +17,19 @@ import com.google.android.gms.maps.OnMapReadyCallback
 import com.google.android.gms.maps.SupportMapFragment
 import com.google.android.gms.maps.model.LatLng
 import com.google.android.gms.maps.model.MarkerOptions
+import com.google.android.gms.tasks.Task
 
 class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     companion object {
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1
+        private const val REQUEST_CHECK_SETTING = 2
     }
     private lateinit var mMap: GoogleMap
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
     private lateinit var lastLocation: Location
     private lateinit var locationCallback: LocationCallback
+    private lateinit var locationRequest: LocationRequest
     private var locationUpdateState = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -47,7 +53,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         }
 
         createLocationRequest()
-
     }
 
     /**
@@ -70,13 +75,46 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         mMap.isMyLocationEnabled = true
     }
 
+    override fun onResume() {
+        super.onResume()
+        if (!locationUpdateState) startLocationUpdates()
+    }
+
+    override fun onPause() {
+        super.onPause()
+        fusedLocationProviderClient.removeLocationUpdates(locationCallback)
+    }
+
     private fun createLocationRequest() {
-        val locationRequest = LocationRequest.create().apply {
+        locationRequest = LocationRequest.create().apply {
             interval  = 10000
             fastestInterval = 5000
             priority = LocationRequest.PRIORITY_HIGH_ACCURACY
         }
         val builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
-        // TODO: Add client
+        val client: SettingsClient = LocationServices.getSettingsClient(this)
+        val task: Task<LocationSettingsResponse> = client.checkLocationSettings(builder.build())
+        task.addOnSuccessListener { locationSettingsResponse ->
+            locationUpdateState = true
+            startLocationUpdates()
+        }
+        task.addOnFailureListener { exception ->
+            if (exception is ResolvableApiException) {
+                try {
+                    exception.startResolutionForResult(this@MapsActivity, REQUEST_CHECK_SETTING)
+                } catch (sendEx: IntentSender.SendIntentException) {
+                    // Ignore the error
+                }
+            }
+        }
+    }
+
+    private fun startLocationUpdates() {
+        if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) !=
+            PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION), LOCATION_PERMISSION_REQUEST_CODE)
+            return
+        }
+        fusedLocationProviderClient.requestLocationUpdates(locationRequest, locationCallback, null)
     }
 }
