@@ -6,10 +6,7 @@ import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.support.v4.app.ActivityCompat
 import com.google.android.gms.common.api.Api
-import com.google.android.gms.location.FusedLocationProviderClient
-import com.google.android.gms.location.LocationCallback
-import com.google.android.gms.location.LocationRequest
-import com.google.android.gms.location.LocationServices
+import com.google.android.gms.location.*
 
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.GoogleMap
@@ -27,7 +24,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
     private lateinit var lastLocation: Location
     private lateinit var locationCallback: LocationCallback
-    private lateinit var lcoationRequest: LocationRequest
     private var locationUpdateState = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -39,9 +35,19 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         mapFragment.getMapAsync(this)
 
         fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this)
+
         locationCallback = object : LocationCallback() {
-            // TODO
+            override fun onLocationResult(p0: LocationResult?) {
+                super.onLocationResult(p0)
+                if (p0 != null) {
+                    lastLocation = p0.lastLocation
+                    // Todo call dweet
+                }
+            }
         }
+
+        createLocationRequest()
+
     }
 
     /**
@@ -62,7 +68,15 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             return
         }
         mMap.isMyLocationEnabled = true
+    }
 
-
+    private fun createLocationRequest() {
+        val locationRequest = LocationRequest.create().apply {
+            interval  = 10000
+            fastestInterval = 5000
+            priority = LocationRequest.PRIORITY_HIGH_ACCURACY
+        }
+        val builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
+        // TODO: Add client
     }
 }
