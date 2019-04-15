@@ -29,6 +29,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     companion object {
         private const val LOCATION_PERMISSION_REQUEST_CODE = 1
         private const val REQUEST_CHECK_SETTING = 2
+        private const val REQUESTING_LOCATION_UPDATES_KEY = "REQUESTING_LOCATION_UPDATES_KEY"
     }
     private lateinit var mMap: GoogleMap
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
@@ -40,16 +41,19 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_maps)
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
-        val mapFragment = supportFragmentManager
-            .findFragmentById(R.id.map) as SupportMapFragment
+        val mapFragment = supportFragmentManager.findFragmentById(R.id.map) as SupportMapFragment
         mapFragment.getMapAsync(this)
 
+        updateValuesFromBundle(savedInstanceState)
         fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this)
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(p0: LocationResult?) {
                 super.onLocationResult(p0)
                 p0 ?: return
-                    dweet(p0.lastLocation)
+                val lastLocation = p0.lastLocation
+                val lastLatLng = LatLng(lastLocation.latitude, lastLocation.longitude)
+                mMap.animateCamera(CameraUpdateFactory.newLatLngZoom(lastLatLng, 12f))
+                dweet(lastLatLng)
             }
         }
         createLocationRequest()
@@ -60,7 +64,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
         if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) !=
             PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION), LOCATION_PERMISSION_REQUEST_CODE)
+            ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION),
+                LOCATION_PERMISSION_REQUEST_CODE)
             return
         }
         mMap.isMyLocationEnabled = true
@@ -74,6 +79,11 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     override fun onPause() {
         super.onPause()
         stopLocationUpdates()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle?) {
+        outState?.putBoolean(REQUESTING_LOCATION_UPDATES_KEY, requestingLocationUpdates)
+        super.onSaveInstanceState(outState)
     }
 
     private fun createLocationRequest() {
@@ -103,7 +113,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private fun startLocationUpdates() {
         if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.ACCESS_FINE_LOCATION) !=
             PackageManager.PERMISSION_GRANTED) {
-            ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION), LOCATION_PERMISSION_REQUEST_CODE)
+            ActivityCompat.requestPermissions(this, arrayOf(android.Manifest.permission.ACCESS_FINE_LOCATION),
+                LOCATION_PERMISSION_REQUEST_CODE)
             return
         }
         fusedLocationProviderClient.requestLocationUpdates(locationRequest, locationCallback, null)
@@ -113,9 +124,9 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         fusedLocationProviderClient.removeLocationUpdates(locationCallback)
     }
 
-    private fun dweet(location: Location) {
+    private fun dweet(latLng: LatLng) {
         val queue = Volley.newRequestQueue(this)
-        val url = "https://dweet.io/dweet/for/square-trouble?latitude=${location.latitude}&longitude=${location.longitude}"
+        val url = "https://dweet.io/dweet/for/square-trouble?latitude=${latLng.latitude}&longitude=${latLng.longitude}"
         val stringRequest = StringRequest(Request.Method.GET, url,
             Response.Listener<String> { response ->  
                 Log.e("dweet", response.toString())
@@ -124,5 +135,12 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             }
         )
         queue.add(stringRequest)
+    }
+
+    private fun updateValuesFromBundle(savedInstanceState: Bundle?) {
+        savedInstanceState ?: return
+        if (savedInstanceState.keySet().contains(REQUESTING_LOCATION_UPDATES_KEY)) {
+            requestingLocationUpdates = savedInstanceState.getBoolean(REQUESTING_LOCATION_UPDATES_KEY)
+        }
     }
 }
