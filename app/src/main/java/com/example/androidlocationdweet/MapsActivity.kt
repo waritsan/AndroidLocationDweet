@@ -7,6 +7,11 @@ import android.location.Location
 import android.support.v7.app.AppCompatActivity
 import android.os.Bundle
 import android.support.v4.app.ActivityCompat
+import android.util.Log
+import com.android.volley.Request
+import com.android.volley.Response
+import com.android.volley.toolbox.StringRequest
+import com.android.volley.toolbox.Volley
 import com.google.android.gms.common.api.Api
 import com.google.android.gms.common.api.ResolvableApiException
 import com.google.android.gms.location.*
@@ -27,7 +32,6 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     }
     private lateinit var mMap: GoogleMap
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
-    private lateinit var lastLocation: Location
     private lateinit var locationCallback: LocationCallback
     private lateinit var locationRequest: LocationRequest
     private var locationUpdateState = false
@@ -41,29 +45,17 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         mapFragment.getMapAsync(this)
 
         fusedLocationProviderClient = LocationServices.getFusedLocationProviderClient(this)
-
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(p0: LocationResult?) {
                 super.onLocationResult(p0)
                 if (p0 != null) {
-                    lastLocation = p0.lastLocation
-                    // Todo call dweet
+                    dweet(p0.lastLocation)
                 }
             }
         }
-
         createLocationRequest()
     }
 
-    /**
-     * Manipulates the map once available.
-     * This callback is triggered when the map is ready to be used.
-     * This is where we can add markers or lines, add listeners or move the camera. In this case,
-     * we just add a marker near Sydney, Australia.
-     * If Google Play services is not installed on the device, the user will be prompted to install
-     * it inside the SupportMapFragment. This method will only be triggered once the user has
-     * installed Google Play services and returned to the app.
-     */
     override fun onMapReady(googleMap: GoogleMap) {
         mMap = googleMap
 
@@ -94,7 +86,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         val builder = LocationSettingsRequest.Builder().addLocationRequest(locationRequest)
         val client: SettingsClient = LocationServices.getSettingsClient(this)
         val task: Task<LocationSettingsResponse> = client.checkLocationSettings(builder.build())
-        task.addOnSuccessListener { locationSettingsResponse ->
+        task.addOnSuccessListener {
             locationUpdateState = true
             startLocationUpdates()
         }
@@ -116,5 +108,18 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             return
         }
         fusedLocationProviderClient.requestLocationUpdates(locationRequest, locationCallback, null)
+    }
+
+    private fun dweet(location: Location) {
+        val queue = Volley.newRequestQueue(this)
+        val url = "https://dweet.io/dweet/for/square-trouble?latitude=${location.latitude}&longitude=${location.longitude}"
+        val stringRequest = StringRequest(Request.Method.GET, url,
+            Response.Listener<String> { response ->  
+                Log.e("dweet", response.toString())
+            }, Response.ErrorListener { error ->
+                Log.e("dweet", error.toString())
+            }
+        )
+        queue.add(stringRequest)
     }
 }
