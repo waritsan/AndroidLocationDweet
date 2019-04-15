@@ -34,7 +34,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
     private lateinit var fusedLocationProviderClient: FusedLocationProviderClient
     private lateinit var locationCallback: LocationCallback
     private lateinit var locationRequest: LocationRequest
-    private var locationUpdateState = false
+    private var requestingLocationUpdates = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -48,9 +48,8 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         locationCallback = object : LocationCallback() {
             override fun onLocationResult(p0: LocationResult?) {
                 super.onLocationResult(p0)
-                if (p0 != null) {
+                p0 ?: return
                     dweet(p0.lastLocation)
-                }
             }
         }
         createLocationRequest()
@@ -69,12 +68,12 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
 
     override fun onResume() {
         super.onResume()
-        if (!locationUpdateState) startLocationUpdates()
+        if (requestingLocationUpdates) startLocationUpdates()
     }
 
     override fun onPause() {
         super.onPause()
-        fusedLocationProviderClient.removeLocationUpdates(locationCallback)
+        stopLocationUpdates()
     }
 
     private fun createLocationRequest() {
@@ -87,7 +86,7 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
         val client: SettingsClient = LocationServices.getSettingsClient(this)
         val task: Task<LocationSettingsResponse> = client.checkLocationSettings(builder.build())
         task.addOnSuccessListener {
-            locationUpdateState = true
+            requestingLocationUpdates = true
             startLocationUpdates()
         }
         task.addOnFailureListener { exception ->
@@ -108,6 +107,10 @@ class MapsActivity : AppCompatActivity(), OnMapReadyCallback {
             return
         }
         fusedLocationProviderClient.requestLocationUpdates(locationRequest, locationCallback, null)
+    }
+
+    private fun stopLocationUpdates() {
+        fusedLocationProviderClient.removeLocationUpdates(locationCallback)
     }
 
     private fun dweet(location: Location) {
